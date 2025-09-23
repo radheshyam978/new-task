@@ -5,7 +5,7 @@ const cors = require('cors');
 
 // ----------------- CONFIG -----------------
 const app = express();
-app.use(cors());
+app.use(cors()); // Allow all origins
 app.use(express.json());
 
 const PORT = process.env.PORT || 5000;
@@ -13,11 +13,12 @@ const MONGO_URI = process.env.MONGO_URI || "mongodb://localhost:27017/testdb";
 
 // ----------------- MONGOOSE MODEL -----------------
 const itemSchema = new mongoose.Schema({
-  name: String,
-  category: String,
-  imagePath: String,
-  sequence: Number
+  name: { type: String, required: true },
+  category: { type: String, required: true },
+  imagePath: { type: String, required: true },
+  sequence: { type: Number, required: true }
 });
+
 const Item = mongoose.model('Item', itemSchema);
 
 // ----------------- CONNECT TO MONGO -----------------
@@ -49,15 +50,15 @@ app.get('/api/items', async (req, res) => {
 
     const [items, total] = await Promise.all([
       Item.find({})
-          .sort({ sequence: 1 })
+          .sort({ sequence: 1 }) // Sort by sequence
           .skip(skip)
           .limit(limit),
       Item.countDocuments()
     ]);
 
-    res.json({ items, total });
+    res.json({ items, total }); // total used for lazy-loading checks
   } catch (err) {
-    console.error(err);
+    console.error("Error fetching items:", err);
     res.status(500).json({ message: "Server error" });
   }
 });

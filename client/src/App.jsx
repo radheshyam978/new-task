@@ -1,101 +1,100 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { fetchItems } from './api';
+import React, { useEffect, useState, useRef, useCallback } from "react";
+import axios from "axios";
 
-export default function App() {
-  const CHUNK = 20;
+const LIMIT = 20; // items per batch
+const DELAY = 5000; // 5 seconds delay
+
+function App() {
   const [items, setItems] = useState([]);
   const [skip, setSkip] = useState(0);
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
-  const [finished, setFinished] = useState(false);
-  const loaderRef = useRef(null);
+  const observerRef = useRef();
 
-  // Load more items
-  const loadMore = useCallback(async () => {
-    if (loading || finished) return;
+  const fetchItems = useCallback(async () => {
+    if (loading) return;
     setLoading(true);
 
     try {
-      const { items: newItems, totalCap } = await fetchItems(skip, CHUNK);
+      // simulate network delay
+      await new Promise(resolve => setTimeout(resolve, DELAY));
 
-      if (!newItems || newItems.length === 0) {
-        setFinished(true);
-        return;
-      }
+      const res = await axios.get("http://localhost:5000/api/items", {
+        params: { skip, limit: LIMIT }
+      });
 
-      // Append and sort
-      setItems(prev => [...prev, ...newItems].sort((a, b) => a.sequence - b.sequence));
-      setSkip(prev => prev + newItems.length);
-
-      if (skip + newItems.length >= totalCap) setFinished(true);
+      setItems(prev => [...prev, ...res.data.items]);
+      setTotal(res.data.total);
+      setSkip(prev => prev + LIMIT);
     } catch (err) {
-      console.error('Error fetching items:', err);
+      console.error("Error fetching items:", err);
     } finally {
       setLoading(false);
     }
-  }, [skip, loading, finished]);
+  }, [skip, loading]);
 
-  // Initial load
+  // Initial fetch
   useEffect(() => {
-    loadMore();
+    fetchItems();
   }, []);
 
-  // Lazy-load with IntersectionObserver
-  useEffect(() => {
-    if (finished) return;
+  // Intersection observer for lazy loading
+  const lastItemRef = useCallback(node => {
+    if (loading) return;
 
-    const observer = new IntersectionObserver(
-      entries => {
-        if (entries[0].isIntersecting && !loading && !finished) {
-          loadMore();
-        }
-      },
-      { rootMargin: '200px', threshold: 0.1 }
-    );
+    if (observerRef.current) observerRef.current.disconnect();
 
-    if (loaderRef.current) observer.observe(loaderRef.current);
-    return () => observer.disconnect();
-  }, [loadMore, finished, loading]);
+    observerRef.current = new IntersectionObserver(entries => {
+      if (entries[0].isIntersecting && items.length < total) {
+        fetchItems();
+      }
+    }, { rootMargin: "200px" });
+
+    if (node) observerRef.current.observe(node);
+  }, [loading, items, total, fetchItems]);
 
   return (
-    <div className="p-6">
-      <h1 className="text-2xl font-bold mb-4">Items (Lazy Loaded with Skeletons)</h1>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {/* Render loaded items */}
-        {items.length > 0 && items.map((it, i) => (
-          <div key={i} className="border rounded p-2">
-            <img
-              src={it.imagePath}
-              alt={it.name}
-              loading="lazy"
-              className="w-full h-32 object-cover mb-2 rounded"
-            />
-            <div className="font-semibold">{it.name}</div>
-            <div className="text-sm text-gray-600">{it.category}</div>
-          </div>
-        ))}
+    <div style={{ maxWidth: "1200px", margin: "0 auto", padding: "20px" }}>
+      <h1 style={{ textAlign: "center", marginBottom: "20px" }}>Item List</h1>
+      <div style={{
+        display: "grid",
+        gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))",
+        gap: "20px"
+      }}>
+        {items.map((item, index) => {
+          const card = (
+            <div key={item._id} style={{
+              border: "1px solid #ddd",
+              borderRadius: "10px",
+              overflow: "hidden",
+              boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
+              transition: "transform 0.2s",
+              cursor: "pointer"
+            }}>
+              <img
+                src={item.imagePath}
+                alt={item.name}
+                style={{ width: "100%", height: "200px", objectFit: "cover" }}
+              />
+              <div style={{ padding: "10px" }}>
+                <h3 style={{ margin: "5px 0" }}>{item.name}</h3>
+                <p style={{ margin: 0, color: "#555" }}>{item.category}</p>
+              </div>
+            </div>
+          );
 
-        {/* Show skeletons while loading */}
-        {loading && Array.from({ length: CHUNK }).map((_, idx) => (
-          <div key={`skeleton-${idx}`} className="border rounded p-2 animate-pulse">
-            <div className="w-full h-32 bg-gray-300 mb-2 rounded"></div>
-            <div className="h-4 bg-gray-300 rounded mb-1"></div>
-            <div className="h-3 bg-gray-200 rounded w-3/4"></div>
-          </div>
-        ))}
-
-        {/* No items */}
-        {!loading && items.length === 0 && (
-          <div className="col-span-full text-center text-gray-500">
-            No items found
-          </div>
-        )}
+          if (index === items.length - 1) {
+            return <div ref={lastItemRef} key={item._id}>{card}</div>;
+          }
+          return card;
+        })}
       </div>
 
-      {/* Observer div */}
-      <div ref={loaderRef} className="py-4 text-center">
-        {!finished && loading && "Loading..."}
-        {finished && items.length > 0 && "✅ All items loaded"}
-      </div>
+      {loading && <p style={{ textAlign: "center", marginTop: "20px" }}>Loading next batch...</p>}
+      {items.length >= total && !loading &&
+        <p style={{ textAlign: "center", marginTop: "20px" }}>All items loaded</p>}
     </div>
   );
 }
+
+export default App;
