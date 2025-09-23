@@ -11,6 +11,7 @@ function App() {
   const [loading, setLoading] = useState(false);
   const observerRef = useRef();
 
+  // Fetch items from deployed backend
   const fetchItems = useCallback(async () => {
     if (loading) return;
     setLoading(true);
@@ -19,7 +20,7 @@ function App() {
       // simulate network delay
       await new Promise(resolve => setTimeout(resolve, DELAY));
 
-      const res = await axios.get("http://localhost:5000/api/items", {
+      const res = await axios.get("https://new-task-5.onrender.com/api/items", {
         params: { skip, limit: LIMIT }
       });
 
@@ -83,6 +84,7 @@ function App() {
             </div>
           );
 
+          // Attach observer to last item
           if (index === items.length - 1) {
             return <div ref={lastItemRef} key={item._id}>{card}</div>;
           }
