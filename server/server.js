@@ -24,46 +24,67 @@ const Item = mongoose.model('Item', itemSchema);
 // ----------------- CONNECT TO MONGO -----------------
 mongoose.connect(MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true })
   .then(async () => {
-    console.log("MongoDB connected");
+    console.log("✅ MongoDB connected");
 
     // Seed DB only if empty
     const count = await Item.countDocuments();
     if (count === 0) {
       const docs = Array.from({ length: 100 }).map((_, i) => ({
         name: `Item ${i + 1}`,
-        category: `Category ${((i % 5) + 1)}`,
+        category: `Category ${((i % 5) + 1)}`, // 5 categories
         imagePath: `https://picsum.photos/seed/item${i + 1}/300/200`,
         sequence: i + 1
       }));
       await Item.insertMany(docs);
-      console.log("Seeded 100 items");
+      console.log("🌱 Seeded 100 items");
     }
   })
-  .catch(err => console.error("MongoDB error:", err));
+  .catch(err => console.error("❌ MongoDB error:", err));
 
-// ----------------- API ENDPOINT -----------------
-// GET /api/items?skip=0&limit=20
+// ----------------- API ENDPOINTS -----------------
+
+// GET /api/items?skip=0&limit=20&search=&category=&sort=
 app.get('/api/items', async (req, res) => {
   try {
     const limit = Math.min(parseInt(req.query.limit) || 20, 100);
     const skip = parseInt(req.query.skip) || 0;
+    const search = req.query.search || "";
+    const category = req.query.category || "";
+    const sort = req.query.sort || "latest";
+
+    const filter = {};
+    if (search) filter.name = { $regex: search, $options: "i" };
+    if (category && category !== "all") filter.category = category;
+
+    let sortOption = { sequence: 1 }; // default by sequence
+    if (sort === "latest") sortOption = { sequence: -1 };
+    if (sort === "az") sortOption = { name: 1 };
+    if (sort === "za") sortOption = { name: -1 };
 
     const [items, total] = await Promise.all([
-      Item.find({})
-          .sort({ sequence: 1 }) // Sort by sequence
-          .skip(skip)
-          .limit(limit),
-      Item.countDocuments()
+      Item.find(filter).sort(sortOption).skip(skip).limit(limit),
+      Item.countDocuments(filter)
     ]);
 
-    res.json({ items, total }); // total used for lazy-loading checks
+    res.json({ items, total });
   } catch (err) {
     console.error("Error fetching items:", err);
     res.status(500).json({ message: "Server error" });
   }
 });
 
+// GET /api/categories → distinct categories
+app.get('/api/categories', async (req, res) => {
+  try {
+    const categories = await Item.distinct("category");
+    res.json(categories);
+  } catch (err) {
+    console.error("Error fetching categories:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
 // ----------------- START SERVER -----------------
 app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
+  console.log(`🚀 Server running on http://localhost:${PORT}`);
 });

@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const BASE_URL = "https://new-task-5.onrender.com/api";
+const BASE_URL = "http://localhost:5000/api";
 
 export const fetchItems = async (skip = 0, limit = 20) => {
   try {
