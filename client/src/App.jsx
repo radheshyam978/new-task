@@ -5,7 +5,7 @@ import { BrowserRouter as Router, Routes, Route, Link, useNavigate } from "react
 
 const LIMIT = 20; // items per batch
 const DELAY = 500; // delay to simulate loading
-const BASE_URL = "http://localhost:5000"; // backend URL
+const BASE_URL = "https://new-task-6.onrender.com"; // backend URL
 
 // ------------------ Login Component ------------------
 function Login() {
